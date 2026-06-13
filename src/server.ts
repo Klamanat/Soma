@@ -37,7 +37,8 @@ app.route("/api/admin", adminRouter);
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-const port = Number(process.env.SOMA_PORT ?? 55000);
+// Railway injects PORT env — fall back to SOMA_PORT, then 55000
+const port = Number(process.env.PORT ?? process.env.SOMA_PORT ?? 55000);
 
 export default {
   port,
