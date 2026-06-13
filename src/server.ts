@@ -42,6 +42,7 @@ const port = Number(process.env.PORT ?? process.env.SOMA_PORT ?? 55000);
 
 export default {
   port,
+  hostname: "0.0.0.0",
   fetch: app.fetch,
 };
 
