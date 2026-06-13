@@ -10,7 +10,7 @@
  *   stopWatcher()          // clean up (tests / graceful shutdown)
  */
 
-import { watch } from "fs";
+import { watch, existsSync } from "fs";
 import { resolve, extname } from "path";
 import { indexFile, removeFile } from "./indexer";
 
@@ -31,6 +31,12 @@ export function startWatcher(userId?: string): void {
   const inkDir = resolve(repoRoot, INK_DIR_NAME);
 
   try {
+    // ink/ may not exist in Docker/cloud deployments — skip silently
+    if (!existsSync(inkDir)) {
+      console.error(`[watcher] ink/ not found at ${inkDir} — skipping`)
+      return
+    }
+
     watcher = watch(inkDir, { recursive: true }, (event, filename) => {
       if (!filename) return;
       if (extname(filename) !== ".md") return;
@@ -48,7 +54,6 @@ export function startWatcher(userId?: string): void {
 
         if (event === "rename") {
           // Could be create or delete — check if file still exists
-          const { existsSync } = await import("fs");
           if (existsSync(fullPath)) {
             // File was created or moved here
             await indexFile(fullPath, userId, inkDir).catch((err) =>
@@ -72,6 +77,13 @@ export function startWatcher(userId?: string): void {
     });
 
     console.error(`[watcher] watching ink/ @ ${inkDir}`);
+
+    // Handle async errors (e.g. directory deleted after watch starts)
+    watcher.on("error", (err) => {
+      console.error(`[watcher] error: ${err}`)
+      watcher?.close()
+      watcher = null
+    })
   } catch (err) {
     // ink/ may not exist yet — not fatal
     console.error(`[watcher] could not start: ${err}`);
