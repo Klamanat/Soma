@@ -8,8 +8,14 @@ import { discoveryRouter } from "./routes/discovery";
 import { indexerRouter } from "./routes/indexer";
 import { startWatcher } from "./watcher";
 
-await bootstrap();
-startWatcher(process.env.SOMA_USER_ID);
+// Bootstrap runs concurrently — server starts immediately so Railway
+// healthcheck can probe /api/health without waiting for DB init
+bootstrap()
+  .then(() => startWatcher(process.env.SOMA_USER_ID))
+  .catch((err) => {
+    console.error(`[bootstrap] fatal: ${err}`);
+    process.exit(1);
+  });
 
 const app = new Hono();
 
