@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { bootstrap } from "./bootstrap";
+import { authMiddleware } from "./auth/middleware";
 import { adminRouter } from "./routes/admin";
 import { knowledgeRouter } from "./routes/knowledge";
 import { healthRouter } from "./routes/health";
@@ -10,7 +11,7 @@ import { startWatcher } from "./watcher";
 // Bootstrap runs concurrently — server starts immediately so Railway
 // healthcheck can probe /api/health without waiting for DB init
 bootstrap()
-  .then(() => startWatcher(process.env.SOMA_USER_ID))
+  .then(() => startWatcher("default"))
   .catch((err) => {
     console.error(`[bootstrap] fatal: ${err}`);
     process.exit(1);
@@ -22,7 +23,10 @@ const app = new Hono();
 app.route("/api", healthRouter);
 app.route("/.well-known", discoveryRouter);
 
-// ── Knowledge routes (single-user, no token required) ────────────────────────
+// ── Inject userId for all /api/* routes (single-user no-op) ──────────────────
+app.use("/api/*", authMiddleware);
+
+// ── Knowledge routes ──────────────────────────────────────────────────────────
 app.route("/api", knowledgeRouter);
 app.route("/api/indexer", indexerRouter);
 
