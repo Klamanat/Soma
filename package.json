@@ -17,7 +17,7 @@
     "test:unit": "vitest run tests/",
     "test:e2e": "playwright test",
     "test:coverage": "vitest run --coverage",
-    "db:push": "drizzle-kit push",
+    "db:push": "bun src/bootstrap.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
+    "@lancedb/lancedb": "^0.30.0",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "bcryptjs": "^3.0.2",
     "drizzle-orm": "^0.44.2",
@@ -33,6 +34,7 @@
     "zod": "^3.24.4"
   },
   "devDependencies": {
+    "@libsql/client": "^0.17.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/bun": "latest",
     "drizzle-kit": "^0.31.1",

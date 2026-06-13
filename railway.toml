@@ -1,0 +1,12 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+target = "http-server"
+
+[deploy]
+startCommand = "bun bin/server.ts"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 10
+
+[[volumes]]
+mountPath = "/app/data"
