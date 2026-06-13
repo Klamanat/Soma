@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from "fs/promises";
+import { resolve, dirname } from "path";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
@@ -5,11 +7,11 @@ import { db } from "../db/index";
 import { somaDocuments } from "../db/schema";
 
 // ── Injection detection ───────────────────────────────────────────────────────
+// Note: [[wikilinks]] are intentionally excluded — we generate them ourselves.
 
 const INJECTION_PATTERNS = [
   /ignore\s+previous\s+instructions/i,
   /system\s+prompt/i,
-  /\[\[.*?\]\]/,
   /<script[\s\S]*?>/i,
   /base64[,:\s][\w+/]{20,}/i,
 ];
@@ -39,6 +41,7 @@ export async function somaLearn(
   id: string;
   created: true;
   embedded: false;
+  file: string;
 }> {
   const input = learnSchema.parse(rawInput);
 
@@ -50,6 +53,18 @@ export async function somaLearn(
   const now = new Date();
   const conceptsJson = input.concepts ? JSON.stringify(input.concepts) : null;
 
+  // ── Compute ink/ file path ──────────────────────────────────────────────────
+  const yearMonth = now.toISOString().slice(0, 7); // YYYY-MM
+  const dateStr = now.toISOString().slice(0, 10);  // YYYY-MM-DD
+  const slug = (input.title ?? id)
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0E00-\u0E7F]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 50);
+  const fileName = `${dateStr}-${slug}.md`;
+  const sourceFile = `memory/${yearMonth}/${fileName}`; // relative to ink/
+
+  // ── Insert into DB ──────────────────────────────────────────────────────────
   db.insert(somaDocuments)
     .values({
       id,
@@ -57,7 +72,7 @@ export async function somaLearn(
       title: input.title ?? null,
       content: input.content,
       concepts: conceptsJson,
-      sourceFile: input.sourceFile ?? null,
+      sourceFile,
       supersededBy: null,
       deleted: 0,
       embeddingStatus: "pending",
@@ -82,5 +97,32 @@ export async function somaLearn(
     }
   }
 
-  return { id, created: true, embedded: false };
+  // ── Write markdown file to ink/ ─────────────────────────────────────────────
+  const repoRoot = resolve(process.env.SOMA_REPO_ROOT ?? ".");
+  const filePath = resolve(repoRoot, "ink", sourceFile);
+  await mkdir(dirname(filePath), { recursive: true });
+
+  const concepts = input.concepts ?? [];
+  const wikilinks = concepts.map((c) => `[[${c}]]`).join(" ");
+
+  const lines: string[] = [
+    "---",
+    `id: ${id}`,
+    `date: ${now.toISOString()}`,
+    `concepts: [${concepts.map((c) => `"${c}"`).join(", ")}]`,
+    "---",
+    "",
+  ];
+  if (input.title) {
+    lines.push(`# ${input.title}`, "");
+  }
+  lines.push(input.content);
+  if (wikilinks) {
+    lines.push("", wikilinks);
+  }
+  lines.push("");
+
+  await writeFile(filePath, lines.join("\n"), "utf8");
+
+  return { id, created: true, embedded: false, file: sourceFile };
 }
