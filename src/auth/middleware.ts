@@ -1,5 +1,7 @@
 import type { Context, Next } from "hono";
-import { verifyToken } from "./tokens";
+
+/** Single-user mode — all requests run as this fixed user ID. */
+export const DEFAULT_USER_ID = "default";
 
 export type AuthEnv = {
   Variables: {
@@ -8,48 +10,17 @@ export type AuthEnv = {
 };
 
 /**
- * Hono middleware: extracts Bearer token from Authorization header,
- * verifies it, and injects userId into context.
- *
- * userId MUST always come from this middleware — never from request body/params.
+ * Single-user middleware: injects the fixed DEFAULT_USER_ID.
+ * No token required.
  */
 export async function authMiddleware(c: Context<AuthEnv>, next: Next) {
-  const authHeader = c.req.header("Authorization");
-
-  if (!authHeader?.startsWith("Bearer ")) {
-    return c.json({ error: "Missing or invalid Authorization header" }, 401);
-  }
-
-  const token = authHeader.slice(7).trim();
-  const userId = await verifyToken(token);
-
-  if (!userId) {
-    return c.json({ error: "Invalid or expired token" }, 401);
-  }
-
-  c.set("userId", userId);
+  c.set("userId", DEFAULT_USER_ID);
   await next();
 }
 
 /**
- * Admin-only middleware: checks SOMA_ADMIN_TOKEN env var.
- * Use for /api/admin/* routes.
+ * Admin middleware: no-op in single-user mode, always allows through.
  */
-export async function adminMiddleware(c: Context, next: Next) {
-  const adminToken = process.env.SOMA_ADMIN_TOKEN;
-  if (!adminToken) {
-    return c.json({ error: "Admin not configured" }, 503);
-  }
-
-  const authHeader = c.req.header("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return c.json({ error: "Missing or invalid Authorization header" }, 401);
-  }
-
-  const provided = authHeader.slice(7).trim();
-  if (provided !== adminToken) {
-    return c.json({ error: "Forbidden" }, 403);
-  }
-
+export async function adminMiddleware(_c: Context, next: Next) {
   await next();
 }

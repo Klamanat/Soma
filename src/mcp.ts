@@ -53,14 +53,10 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
-// ── Helper: get userId from environment (MCP stdio — single-tenant per process) ──
+// ── Helper: get userId (single-user mode — always "default") ──────────────────
 
 function getUserId(): string {
-  const userId = process.env.SOMA_USER_ID;
-  if (!userId) {
-    throw new Error("SOMA_USER_ID environment variable is required");
-  }
-  return userId;
+  return "default";
 }
 
 // ── soma_search ───────────────────────────────────────────────────────────────

@@ -21,7 +21,15 @@ export async function bootstrap(): Promise<void> {
   const { runMigrations } = await import("./db/migrate");
   runMigrations();
 
-  // 5. Ensure ink/ directory structure
+  // 5. Ensure default single user exists (single-user mode)
+  const { DEFAULT_USER_ID } = await import("./auth/middleware");
+  sqlite.run(
+    `INSERT OR IGNORE INTO soma_users (id, name, token, role, last_rotated_at, created_at)
+     VALUES (?, 'default', 'single-user', 'user', ?, ?)`,
+    [DEFAULT_USER_ID, Date.now(), Date.now()],
+  );
+
+  // 6. Ensure ink/ directory structure
   const inkDirs = [
     "ink",
     "ink/decisions",

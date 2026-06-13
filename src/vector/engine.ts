@@ -24,7 +24,8 @@ export interface VectorSearchResult {
 
 interface LanceEngine {
   table: unknown;
-  lancedb: typeof import("vectordb") | typeof import("@lancedb/lancedb");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  lancedb: any;
 }
 
 // ── Module-level state (singleton) ───────────────────────────────────────────
