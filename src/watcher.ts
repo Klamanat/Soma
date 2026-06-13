@@ -33,8 +33,8 @@ export function startWatcher(userId?: string): void {
   try {
     // ink/ may not exist in Docker/cloud deployments — skip silently
     if (!existsSync(inkDir)) {
-      console.error(`[watcher] ink/ not found at ${inkDir} — skipping`)
-      return
+      console.error(`[watcher] ink/ not found at ${inkDir} — skipping`);
+      return;
     }
 
     watcher = watch(inkDir, { recursive: true }, (event, filename) => {
@@ -80,10 +80,10 @@ export function startWatcher(userId?: string): void {
 
     // Handle async errors (e.g. directory deleted after watch starts)
     watcher.on("error", (err) => {
-      console.error(`[watcher] error: ${err}`)
-      watcher?.close()
-      watcher = null
-    })
+      console.error(`[watcher] error: ${err}`);
+      watcher?.close();
+      watcher = null;
+    });
   } catch (err) {
     // ink/ may not exist yet — not fatal
     console.error(`[watcher] could not start: ${err}`);
