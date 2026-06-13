@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile, access, appendFile } from "fs/promises";
 import { resolve, dirname } from "path";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
@@ -54,14 +54,15 @@ export async function somaLearn(
   const conceptsJson = input.concepts ? JSON.stringify(input.concepts) : null;
 
   // ── Compute ink/ file path ──────────────────────────────────────────────────
-  const yearMonth = now.toISOString().slice(0, 7); // YYYY-MM
-  const dateStr = now.toISOString().slice(0, 10);  // YYYY-MM-DD
+  const yearMonth = now.toISOString().slice(0, 7);  // YYYY-MM
+  const day = now.toISOString().slice(8, 10);        // DD
+  const hhmm = now.toISOString().slice(11, 16).replace(":", ""); // HHmm
   const slug = (input.title ?? id)
     .toLowerCase()
     .replace(/[^a-z0-9\u0E00-\u0E7F]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 50);
-  const fileName = `${dateStr}-${slug}.md`;
+  const fileName = `${day}-${hhmm}-${slug}.md`;
   const sourceFile = `memory/${yearMonth}/${fileName}`; // relative to ink/
 
   // ── Insert into DB ──────────────────────────────────────────────────────────
@@ -97,32 +98,64 @@ export async function somaLearn(
     }
   }
 
-  // ── Write markdown file to ink/ ─────────────────────────────────────────────
+  // ── Write 3 ink/ files ────────────────────────────────────────────────────
   const repoRoot = resolve(process.env.SOMA_REPO_ROOT ?? ".");
-  const filePath = resolve(repoRoot, "ink", sourceFile);
-  await mkdir(dirname(filePath), { recursive: true });
-
+  const inkDir = resolve(repoRoot, "ink");
   const concepts = input.concepts ?? [];
   const wikilinks = concepts.map((c) => `[[${c}]]`).join(" ");
 
-  const lines: string[] = [
-    "---",
-    `id: ${id}`,
-    `date: ${now.toISOString()}`,
-    `concepts: [${concepts.map((c) => `"${c}"`).join(", ")}]`,
-    "---",
-    "",
-  ];
-  if (input.title) {
-    lines.push(`# ${input.title}`, "");
-  }
-  lines.push(input.content);
-  if (wikilinks) {
-    lines.push("", wikilinks);
-  }
-  lines.push("");
+  try {
+    // 1. ink/memory/YYYY-MM/DD-HHmm-slug.md ─────────────────────────────────
+    const memPath = resolve(inkDir, sourceFile);
+    await mkdir(dirname(memPath), { recursive: true });
 
-  await writeFile(filePath, lines.join("\n"), "utf8");
+    const memLines: string[] = [
+      "---",
+      `id: ${id}`,
+      `date: ${now.toISOString()}`,
+      `concepts: [${concepts.map((c) => `"${c}"`).join(", ")}]`,
+      "---",
+      "",
+    ];
+    if (input.title) memLines.push(`# ${input.title}`, "");
+    memLines.push(input.content);
+    if (wikilinks) memLines.push("", wikilinks);
+    memLines.push("");
+    await writeFile(memPath, memLines.join("\n"), "utf8");
+
+    // 2. ink/concepts/<concept>.md — hub node (create only if missing) ───────
+    for (const concept of concepts) {
+      const cPath = resolve(inkDir, "concepts", `${concept}.md`);
+      await mkdir(dirname(cPath), { recursive: true });
+      const exists = await access(cPath).then(() => true).catch(() => false);
+      if (!exists) {
+        const hubLines = [
+          "---",
+          `concept: "${concept}"`,
+          "---",
+          "",
+          `# ${concept}`,
+          "",
+        ];
+        await writeFile(cPath, hubLines.join("\n"), "utf8");
+      }
+    }
+
+    // 3. ink/index/YYYY-MM.md — append entry ─────────────────────────────────
+    const idxPath = resolve(inkDir, "index", `${yearMonth}.md`);
+    await mkdir(dirname(idxPath), { recursive: true });
+    const idxExists = await access(idxPath).then(() => true).catch(() => false);
+    if (!idxExists) {
+      await writeFile(idxPath, `# Index — ${yearMonth}\n\n`, "utf8");
+    }
+    const dateStr = now.toISOString().slice(0, 10);
+    const idxEntry = `- [[memory/${yearMonth}/${fileName.replace(".md", "")}]] — ${input.title ?? id} (${dateStr})\n`;
+    await appendFile(idxPath, idxEntry, "utf8");
+
+  } catch (err) {
+    // File write failure is non-fatal — DB insert already succeeded
+    console.error(`[learn] file write error: ${err}`);
+  }
 
   return { id, created: true, embedded: false, file: sourceFile };
 }
