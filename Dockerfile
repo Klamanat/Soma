@@ -13,8 +13,9 @@ COPY . .
 
 # ── Target 1: HTTP server ─────────────────────────────────────────────────────
 FROM base AS http-server
+# PORT is injected by Railway at runtime — do not hardcode EXPOSE
+# SOMA_PORT used as fallback for local dev only
 ENV SOMA_PORT=55000
-EXPOSE 55000
 CMD ["bun", "bin/server.ts"]
 
 # ── Target 2: MCP stdio ───────────────────────────────────────────────────────
